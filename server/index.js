@@ -199,4 +199,103 @@ async function maybeSummarizeSession(prisma, chatId, userId) {
 
   const convo = lastMsgs.reverse().map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
   const system =
-    'Summarize this conversa
+    'Summarize this conversation into 1-2 concise sentences, focusing on stable preferences/facts. Avoid PII beyond what is present.';
+
+  try {
+    const summary = await llmChat(system, convo);
+    const [emb] = await llmEmbed([summary]);
+    await prisma.memory.create({
+      data: { userId, text: summary, embedding: emb, kind: 'summary' },
+    });
+    console.log('[SESSION SUMMARY SAVED]');
+  } catch (e) {
+    console.error('[SESSION SUMMARY ERROR]', e?.stack || e);
+  }
+}
+
+// --------- ROUTES ---------
+app.get('/', (_req, res) => {
+  res.type('html').send(`
+    <h1>AI Companion API</h1>
+    <p>Service is running.</p>
+    <ul>
+      <li>Health: <a href="/healthz">/healthz</a></li>
+      <li>POST Chat: <code>/api/chat</code></li>
+      <li>GET Memory: <a href="/api/me/memory">/api/me/memory</a></li>
+    </ul>
+  `);
+});
+
+app.get('/healthz', (_req, res) => res.json({ ok: true }));
+
+const api = express.Router();
+
+api.post('/chat', async (req, res) => {
+  try {
+    const aid = req.aid;
+    const { message } = req.body || {};
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'message required' });
+    }
+
+    const user = await prisma.user.upsert({ where: { aid }, update: {}, create: { aid } });
+    const chat = await prisma.chat.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id } });
+
+    await prisma.message.create({ data: { chatId: chat.id, role: 'user', content: message } });
+
+    // extract & save simple facts
+    const facts = naiveExtractFacts(message);
+    if (facts.length) {
+      const embeds = await llmEmbed(facts);
+      for (let i = 0; i < facts.length; i++) {
+        await prisma.memory.create({
+          data: { userId: user.id, text: facts[i], embedding: embeds[i], kind: 'fact' },
+        });
+      }
+    }
+
+    // recall
+    const all = await prisma.memory.findMany({ where: { userId: user.id }, take: 500 });
+    let recall = [];
+    if (all.length) {
+      const [qVec] = await llmEmbed([message]);
+      const scored = all
+        .map((m) => ({ m, s: cosine(qVec, m.embedding || []) }))
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 8);
+      recall = scored.filter((r) => r.s > 0.1).map((r) => r.m.text);
+    }
+
+    const system = (await buildSystemPrompt(prisma, aid)) + (recall.length ? '\nRelevant memories: ' + recall.join(' | ') : '');
+    const reply = await llmChat(system, message);
+
+    await prisma.message.create({ data: { chatId: chat.id, role: 'assistant', content: reply } });
+
+    // fire-and-forget
+    maybeSummarizeSession(prisma, chat.id, user.id).catch((e) =>
+      console.error('[ASYNC SUMMARY ERROR]', e?.stack || e)
+    );
+
+    return res.json({ reply });
+  } catch (e) {
+    console.error('[SERVER_ERROR]', e?.stack || e);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+api.get('/me/memory', async (req, res) => {
+  const aid = req.aid;
+  const user = await prisma.user.upsert({ where: { aid }, update: {}, create: { aid } });
+  const mems = await prisma.memory.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  res.json({ items: mems });
+});
+
+app.use('/api', api);
+
+// --------- START ---------
+const port = +(process.env.PORT || 3000);
+app.listen(port, () => console.log('Server listening on ' + port));
