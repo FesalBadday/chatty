@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: ai-companion-server
+    env: node
+    rootDir: server
+    plan: free
+    region: oregon
+    buildCommand: |
+      npm ci
+      npx prisma generate
+      npx prisma migrate deploy
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-companion-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://openrouter.ai/api
+      - key: OPENAI_MODEL
+        value: meta-llama/llama-3-8b-instruct:free
+      - key: OPENAI_EMBED_MODEL
+        value: text-embedding-3-small
+      - key: ALLOW_ORIGIN
+        value: https://your-frontend-site.netlify.app
+databases:
+  - name: ai-companion-db
+    plan: free
