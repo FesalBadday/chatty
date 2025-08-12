@@ -3,6 +3,7 @@ services:
     name: ai-companion-server
     env: node
     plan: free
+    rootDir: server
     buildCommand: |
       npm install
       npx prisma generate
@@ -16,7 +17,7 @@ services:
           name: ai-companion-db
           property: connectionString
       - key: OPENAI_API_KEY
-        sync: false 
+        sync: false
       - key: OPENAI_BASE_URL
         value: https://openrouter.ai/api
       - key: OPENAI_MODEL
