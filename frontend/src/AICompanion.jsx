@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) ||
-  (typeof window !== 'undefined' && window.__API_BASE__) ||
-  "";
+const API_BASE = "";
 
 
 const POSITIVE_WORDS = ["love", "great", "awesome", "good", "nice", "cool", "happy", "wonderful", "amazing", "yay", "fun", "thanks", "thank you", "sweet"];
