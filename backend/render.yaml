@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-chat-openrouter-proxy
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: PUBLIC_SITE_URL
+        value: https://your-site.netlify.app
+      - key: ALLOWED_ORIGIN
+        value: https://your-site.netlify.app

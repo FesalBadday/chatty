@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Glossy AI Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --panel: rgba(22, 28, 36, 0.7);
+      --border: rgba(255,255,255,0.08);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #7c3aed; /* violet */
+      --accent-2: #22d3ee; /* cyan */
+      --shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.02);
+      --radius: 18px;
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 700px at 20% -10%, rgba(34,211,238,0.15), transparent 50%),
+                  radial-gradient(1000px 600px at 120% 10%, rgba(124,58,237,0.18), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+    }
+    .app{ display:flex; flex-direction:column; height:100%; max-width: 980px; margin: 0 auto; padding: 20px; gap:16px; }
+    .card{
+      background: var(--panel);
+      backdrop-filter: saturate(140%) blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    header.card{ padding: 16px 18px; display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+    header h1{ font-size: 16px; font-weight: 600; letter-spacing: 0.2px; margin:0; }
+    header .controls{ display:flex; gap:10px; align-items:center; }
+    select, input[type="number"], button.icon {
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      color: var(--text); border:1px solid var(--border); border-radius: 12px; height:36px; padding:0 10px;
+    }
+    select:focus, input[type="number"]:focus, textarea:focus{ outline:2px solid rgba(124,58,237,0.35); }
+    button.primary{ background: linear-gradient(180deg, rgba(124,58,237,0.9), rgba(124,58,237,0.7)); border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); padding: 10px 14px; border-radius: 12px; color:white; font-weight:600; }
+    button.icon{ display:grid; place-items:center; width:36px; }
+    .chat.card{ flex:1; overflow:auto; padding: 18px; display:flex; flex-direction:column; gap:14px; }
+    .msg{ display:flex; gap:10px; align-items:flex-start; }
+    .msg .avatar{ width:28px; height:28px; border-radius:10px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 16px rgba(124,58,237,0.35); }
+    .msg.user .avatar{ background: linear-gradient(135deg, #10b981, #22d3ee); }
+    .bubble{ max-width: 80%; padding: 12px 14px; border-radius: 14px; border:1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); box-shadow: var(--shadow); white-space: pre-wrap; line-height: 1.5; }
+    .msg.user .bubble{ background: linear-gradient(180deg, rgba(16,185,129,0.15), rgba(16,185,129,0.06)); }
+    .msg.assistant .bubble code{ background: rgba(255,255,255,0.06); padding:2px 6px; border-radius:8px; }
+    .msg.assistant .bubble pre{ background: rgba(0,0,0,0.35); padding:12px; border-radius:12px; overflow:auto; position: relative; }
+    .copy-btn{ position:absolute; top:8px; right:8px; font-size:12px; padding:6px 8px; border-radius:8px; border:1px solid var(--border); background: rgba(255,255,255,0.05); color:var(--text); cursor:pointer; }
+    .composer.card{ padding: 12px; display:flex; gap:10px; align-items:flex-end; }
+    textarea{
+      flex:1; resize:none; min-height:56px; max-height:180px; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); color: var(--text);
+    }
+    .hint{ color: var(--muted); font-size: 12px; }
+    dialog{ width: 720px; max-width: 96vw; border-radius: 16px; border:1px solid var(--border); background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+    dialog::backdrop{ background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+    .grid{ display:grid; grid-template-columns: 1fr; gap:12px; }
+    .row{ display:flex; gap:10px; align-items:center; }
+    .row label{ width: 160px; color: var(--muted); }
+    .row input, .row select, .row textarea{ width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="card">
+      <h1>✨ Glossy AI Chat</h1>
+      <div class="controls">
+        <select id="model">
+          <option value="openrouter/auto">Auto (best)</option>
+          <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+          <option value="openai/gpt-4o">GPT‑4o</option>
+          <option value="google/gemini-1.5-pro">Gemini 1.5 Pro</option>
+          <option value="meta-llama/llama-3.1-405b-instruct">Llama 3.1 405B</option>
+        </select>
+        <input id="temp" type="number" step="0.1" min="0" max="2" value="0.7" title="temperature"/>
+        <button id="openSettings" class="icon" title="Settings">⚙️</button>
+        <button id="clear" class="icon" title="Clear chat">🗑️</button>
+      </div>
+    </header>
+
+    <main id="chat" class="chat card" aria-live="polite"></main>
+
+    <div class="composer card">
+      <textarea id="input" placeholder="Ask me anything… (Shift+Enter = newline)"></textarea>
+      <button id="send" class="primary">Send ↵</button>
+    </div>
+
+    <div class="hint">Pro tip: tweak model, temperature, and system prompt from ⚙️</div>
+  </div>
+
+  <dialog id="settings">
+    <form method="dialog" style="padding:16px 18px;" class="grid">
+      <h3 style="margin:0 0 8px 0">Assistant Settings</h3>
+      <div class="row">
+        <label for="system">System prompt</label>
+        <textarea id="system" rows="5" placeholder="You are a helpful, concise AI."></textarea>
+      </div>
+      <div class="row">
+        <label for="api">API base (proxy)</label>
+        <input id="api" placeholder="https://ai-chat-openrouter-proxy.onrender.com" />
+      </div>
+      <div class="row" style="justify-content:flex-end; gap:8px;">
+        <button value="cancel">Close</button>
+        <button id="saveSettings" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const LS = { KEY: "glossy-chat-state-v1" };
+    const DEFAULTS = {
+      apiBase: "https://ai-chat-openrouter-proxy.onrender.com",
+      system: "You are a helpful, concise AI assistant.",
+      model: "openrouter/auto",
+      temperature: 0.7,
+      messages: [],
+    };
+
+    let state = loadState();
+
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const modelEl = document.getElementById('model');
+    const tempEl = document.getElementById('temp');
+    const clearBtn = document.getElementById('clear');
+    const settingsDlg = document.getElementById('settings');
+    const openSettingsBtn = document.getElementById('openSettings');
+    const saveSettingsBtn = document.getElementById('saveSettings');
+    const systemEl = document.getElementById('system');
+    const apiEl = document.getElementById('api');
+
+    modelEl.value = state.model;
+    tempEl.value = state.temperature;
+    systemEl.value = state.system;
+    apiEl.value = state.apiBase;
+    renderAll();
+
+    openSettingsBtn.addEventListener('click', () => settingsDlg.showModal());
+    saveSettingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      state.system = systemEl.value.trim();
+      state.apiBase = apiEl.value.trim() || DEFAULTS.apiBase;
+      persist();
+      settingsDlg.close();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      if (confirm('Clear this conversation?')) {
+        state.messages = [];
+        persist();
+        renderAll();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'inherit';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px';
+    });
+
+    modelEl.addEventListener('change', () => {
+      state.model = modelEl.value;
+      persist();
+    });
+
+    tempEl.addEventListener('change', () => {
+      state.temperature = Number(tempEl.value);
+      persist();
+    });
+
+    async function sendMessage(){
+      const content = inputEl.value.trim();
+      if (!content) return;
+      inputEl.value = '';
+      inputEl.style.height = 'inherit';
+
+      state.messages.push({ role: 'user', content });
+      renderAll();
+
+      const idx = state.messages.push({ role: 'assistant', content: '' }) - 1;
+      renderAll();
+      scrollToBottom();
+
+      try {
+        const resp = await fetch(`${state.apiBase}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: state.messages.filter(m => m.role !== 'assistant' || m.content),
+            model: state.model,
+            temperature: state.temperature,
+            system: state.system,
+          }),
+        });
+
+        if (!resp.ok || !resp.body) {
+          const text = await resp.text();
+          throw new Error(text || `HTTP ${resp.status}`);
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const parts = buffer.split('\\n\\n');
+          buffer = parts.pop();
+
+          for (const part of parts) {
+            if (!part.startsWith('data:')) continue;
+            const line = part.replace(/^data:\\s*/, '').trim();
+            if (line === '[DONE]') continue;
+            try {
+              const json = JSON.parse(line);
+              const delta = json.choices?.[0]?.delta?.content || '';
+              if (delta) {
+                state.messages[idx].content += delta;
+                renderLastAssistant(idx);
+                scrollToBottom();
+              }
+            } catch {}
+          }
+        }
+        persist();
+      } catch (err) {
+        state.messages[idx].content += `\n\n⚠️ Error: ${String(err).slice(0, 300)}`;
+        renderLastAssistant(idx);
+      }
+    }
+
+    function renderAll(){
+      chatEl.innerHTML = '';
+      state.messages.forEach((m, i) => chatEl.appendChild(renderMsg(m, i)));
+      scrollToBottom();
+    }
+
+    function renderLastAssistant(i){
+      const node = chatEl.children[i];
+      if (!node) return renderAll();
+      const bubble = node.querySelector('.bubble');
+      bubble.innerHTML = mdToHtml(state.messages[i].content);
+      attachCopyButtons(bubble);
+    }
+
+    function renderMsg(m, i){
+      const el = document.createElement('div');
+      el.className = `msg ${m.role}`;
+      el.innerHTML = `
+        <div class="avatar"></div>
+        <div class="bubble">${mdToHtml(m.content)}</div>
+      `;
+      attachCopyButtons(el);
+      return el;
+    }
+
+    function scrollToBottom(){
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function escapeHtml(s){
+      return s.replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    }
+    function mdToHtml(md){
+      if (!md) return '';
+      let html = escapeHtml(md);
+      html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (m, lang, code) => {
+        return `<pre data-lang="${lang||''}"><button class="copy-btn" data-code="${encodeURIComponent(code)}">Copy</button><code>${escapeHtml(code)}</code></pre>`;
+      });
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      html = html.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      html = html.replace(/\n/g, '<br>');
+      return html;
+    }
+
+    function attachCopyButtons(scope){
+      scope.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const code = decodeURIComponent(btn.dataset.code || '');
+          await navigator.clipboard.writeText(code);
+          btn.textContent = 'Copied!';
+          setTimeout(() => (btn.textContent = 'Copy'), 1200);
+        };
+      });
+    }
+
+    function loadState(){
+      try { return JSON.parse(localStorage.getItem(LS.KEY)) || { ...DEFAULTS }; }
+      catch { return { ...DEFAULTS }; }
+    }
+    function persist(){
+      localStorage.setItem(LS.KEY, JSON.stringify(state));
+    }
+  </script>
+</body>
+</html>
