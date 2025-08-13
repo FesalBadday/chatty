@@ -3,62 +3,116 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Glossy AI Chat — WebLLM Free</title>
+  <title>Glossy AI Chat — WebLLM Free (Fixed Worker)</title>
   <style>
-    body { background:#0b0f14; color:white; font-family:sans-serif; margin:0; }
-    .app { max-width:800px; margin:auto; padding:20px; display:flex; flex-direction:column; gap:10px; }
-    .chat { flex:1; min-height:400px; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; overflow:auto; }
-    .msg { margin:5px 0; padding:8px; border-radius:6px; }
-    .user { background:rgba(16,185,129,0.2); }
-    .assistant { background:rgba(124,58,237,0.2); }
-    textarea { width:100%; padding:10px; border-radius:6px; border:none; resize:none; }
-    button { padding:10px; border:none; border-radius:6px; background:#7c3aed; color:white; font-weight:bold; cursor:pointer; }
+    body { background:#0b0f14; color:#e5e7eb; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; }
+    .app { max-width:880px; margin:auto; padding:20px; display:flex; flex-direction:column; gap:12px; }
+    .card{ background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; backdrop-filter: blur(10px) saturate(140%); }
+    h1{ font-size:16px; margin:0 0 4px 0; }
+    .chat { min-height:420px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+    .msg { padding:10px 12px; border-radius:12px; max-width:80%; }
+    .user { background: rgba(16,185,129,0.18); align-self:flex-end; }
+    .assistant { background: rgba(124,58,237,0.18); align-self:flex-start; }
+    .composer { display:flex; gap:10px; align-items:flex-end; }
+    textarea { flex:1; min-height:56px; max-height:180px; resize:none; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color:#e5e7eb; }
+    button { padding:12px 14px; border:none; border-radius:12px; background:linear-gradient(180deg, rgba(124,58,237,0.9), rgba(124,58,237,0.7)); color:white; font-weight:600; cursor:pointer; }
+    .row { display:flex; gap:8px; align-items:center; }
+    select, input[type="number"] { height:36px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.06); color:#e5e7eb; padding:0 10px; }
+    .hint { color:#9ca3af; font-size:12px; }
   </style>
 </head>
 <body>
-<div class="app">
-  <h1>Glossy AI Chat — Free (WebLLM)</h1>
-  <div id="chat" class="chat"></div>
-  <textarea id="input" rows="3" placeholder="Type your message..."></textarea>
-  <button id="send">Send</button>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/dist/web-llm.min.js"></script>
-<script>
-const chatEl = document.getElementById('chat');
-const inputEl = document.getElementById('input');
-const sendBtn = document.getElementById('send');
-let messages = [];
-let enginePromise = null;
+  <div class="app">
+    <div class="card row" style="justify-content:space-between;">
+      <h1>✨ Glossy AI Chat — Free (WebLLM)</h1>
+      <div class="row">
+        <label>Model</label>
+        <select id="model">
+          <option value="Phi-3-mini-4k-instruct-q4f32_1">Phi‑3 mini (fast)</option>
+          <option value="Llama-3.1-8B-Instruct-q4f32_1">Llama 3.1 8B (better)</option>
+        </select>
+        <label>Temp</label>
+        <input id="temp" type="number" step="0.1" min="0" max="2" value="0.7">
+      </div>
+    </div>
 
-async function getEngine(){
-  if(!navigator.gpu) { alert("WebGPU not supported in this browser."); throw new Error("No WebGPU"); }
-  if(!enginePromise){
-    const worker = new Worker("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/dist/worker.js", {type:"module"});
-    enginePromise = window.webllm.createWebWorkerMLCEngine(worker, { model:"Phi-3-mini-4k-instruct-q4f32_1" });
-  }
-  return enginePromise;
-}
+    <div id="chat" class="card chat" aria-live="polite"></div>
 
-function render(){
-  chatEl.innerHTML = messages.map(m=>`<div class="msg ${m.role}">${m.content}</div>`).join("");
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
+    <div class="card composer">
+      <textarea id="input" placeholder="Ask me anything… (Shift+Enter = newline)"></textarea>
+      <button id="send">Send ↵</button>
+    </div>
 
-async function sendMessage(){
-  const text = inputEl.value.trim();
-  if(!text) return;
-  messages.push({role:"user", content:text});
-  render();
-  inputEl.value="";
-  const idx = messages.push({role:"assistant", content:""}) - 1;
-  const engine = await getEngine();
-  await engine.chat.completions.create({messages, stream:true}, (evt)=>{
-    const delta = evt?.choices?.[0]?.delta?.content || "";
-    if(delta){ messages[idx].content += delta; render(); }
-  });
-}
+    <div class="hint">Runs fully in your browser via WebGPU. First reply may take longer while the model loads.</div>
+  </div>
 
-sendBtn.onclick = sendMessage;
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/dist/web-llm.min.js"></script>
+  <script>
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const modelEl = document.getElementById('model');
+    const tempEl = document.getElementById('temp');
+    const messages = [];
+    let enginePromise = null;
+    let currentModel = modelEl.value;
+
+    function render(){
+      chatEl.innerHTML = messages.map(m=>`<div class="msg ${m.role}">${m.content}</div>`).join("");
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+    function add(role, content){ messages.push({role, content}); render(); }
+
+    modelEl.addEventListener('change', async () => {
+      currentModel = modelEl.value;
+      enginePromise = null; // force reload on next send
+      add('assistant', `🔄 Switched model to **${currentModel}**. It will load on next message.`);
+    });
+    tempEl.addEventListener('change', ()=>{}); // read when generating
+
+    async function getEngine(){
+      if(!navigator.gpu){ alert('WebGPU not supported. Use Chrome/Edge desktop.'); throw new Error('No WebGPU'); }
+      if(!enginePromise){
+        // Use a same-origin worker file to avoid cross-origin worker restrictions
+        const worker = new Worker('./worker.js', { type: 'module' });
+        enginePromise = window.webllm.createWebWorkerMLCEngine(worker, { model: currentModel });
+      }
+      const engine = await enginePromise;
+      const loaded = await engine.runtime.getLoadedModel();
+      if(!loaded || loaded.model_id !== currentModel){
+        await engine.reload({ model: currentModel });
+      }
+      return engine;
+    }
+
+    async function sendMessage(){
+      const text = inputEl.value.trim();
+      if(!text) return;
+      inputEl.value='';
+      add('user', text);
+      add('assistant', '');
+      const idx = messages.length - 1;
+
+      try{
+        const engine = await getEngine();
+        let reply = '';
+        await engine.chat.completions.create({
+          messages, stream:true, temperature: Number(tempEl.value||0.7)
+        }, (evt)=>{
+          const delta = evt?.choices?.[0]?.delta?.content || '';
+          if(delta){ reply += delta; messages[idx].content = reply; render(); }
+        });
+      }catch(e){
+        messages[idx].content += `\n\n⚠️ ${e.message||e}`; render();
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+    });
+
+    add('assistant', 'Hi! I run 100% in your browser — pick a model and ask me anything.');
+  </script>
 </body>
 </html>
