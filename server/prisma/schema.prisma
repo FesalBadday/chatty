@@ -9,17 +9,39 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  name      String?
-  email     String?  @unique
-  memory    Memory[]
+  aid       String   @unique
+  createdAt DateTime @default(now())
+
+  chat     Chat?
+  memories Memory[]
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String    @unique
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  chatId    String
+  role      String
+  content   String
   createdAt DateTime @default(now())
 }
 
 model Memory {
   id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
   userId    String
-  content   String
+  text      String
+  embedding Json
+  kind      String   @default("fact")
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+  @@index([kind, createdAt])
 }
