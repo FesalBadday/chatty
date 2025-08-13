@@ -1,8 +1,5 @@
 // server/prisma/schema.prisma
-
-generator client {
-  provider = "prisma-client-js"
-}
+generator client { provider = "prisma-client-js" }
 
 datasource db {
   provider = "postgresql"
@@ -13,43 +10,35 @@ model User {
   id        String   @id @default(cuid())
   aid       String   @unique
   createdAt DateTime @default(now())
-
-  // Relations
   chat      Chat?
   memories  Memory[]
 }
 
 model Chat {
   id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  // Relations
   user      User     @relation(fields: [userId], references: [id])
   userId    String   @unique
   messages  Message[]
+  createdAt DateTime @default(now())
 }
 
 model Message {
   id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
   chat      Chat     @relation(fields: [chatId], references: [id])
   chatId    String
-
-  role      String   // 'user' | 'assistant'
+  role      String
   content   String
+  createdAt DateTime @default(now())
 }
 
 model Memory {
   id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
   user      User     @relation(fields: [userId], references: [id])
   userId    String
-
   text      String
-  embedding Json      // JSON vector (Postgres supports Json/JsonB)
-  kind      String    @default("fact") // 'fact' | 'summary'
+  embedding Json
+  kind      String   @default("fact")
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([kind, createdAt])

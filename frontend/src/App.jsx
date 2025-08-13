@@ -1,3 +1,3 @@
 import React from 'react'
-import AICompanion from './AICompanion.jsx'
-export default function App(){return(<div className='min-h-screen'><AICompanion/></div>)}
+import Chat from './Chat.jsx'
+export default function App(){return(<div className='min-h-screen'><Chat/></div>)}

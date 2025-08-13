@@ -26,6 +26,8 @@ services:
         value: meta-llama/llama-3-8b-instruct:free
       - key: OPENAI_EMBED_MODEL
         value: nomic-ai/nomic-embed-text-v1.5
+      - key: PUBLIC_URL
+        value: https://chattyp.netlify.app
 
 databases:
   - name: ai-companion-db
